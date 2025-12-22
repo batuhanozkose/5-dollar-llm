@@ -5,6 +5,8 @@ from .layers import (
     TransformerBlock,
 )
 from .llm import MinimalLLM
+from .parallel_block import ParallelTransformerBlock
+from .fast_llm import FastLLM
 
 __all__ = [
     "SwiGLUFeedForward",
@@ -12,4 +14,6 @@ __all__ = [
     "MultiHeadAttention",
     "TransformerBlock",
     "MinimalLLM",
+    "ParallelTransformerBlock",
+    "FastLLM",
 ]
