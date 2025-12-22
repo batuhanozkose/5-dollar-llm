@@ -12,7 +12,7 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 from configs.llm_config import BlueberryConfig
 from configs.dataset_config import DataConfig
-from training.trainer import train_minimal_llm, train_model, setup_muon_optimizer, setup_adafactor_optimizer
+from training.trainer import train_minimal_llm, train_model, setup_muon_optimizer
 from utils.helpers import set_seed, format_time
 from utils.logger import setup_logging
 
@@ -328,11 +328,8 @@ def main():
             del initial_state
             torch.cuda.empty_cache()
         
-        # Setup optimizer
-        if getattr(config, 'use_adafactor', False):
-            optimizers = setup_adafactor_optimizer(model, config)
-        else:
-            optimizers = setup_muon_optimizer(model, config)
+        # Setup optimizer (always use Muon)
+        optimizers = setup_muon_optimizer(model, config)
         
         # Setup scheduler
         tokens_per_opt = config.batch_size * config.max_seq_len * config.gradient_accumulation_steps
