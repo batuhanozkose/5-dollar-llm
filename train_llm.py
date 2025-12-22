@@ -355,6 +355,19 @@ def main():
             target_train_loss=args.target_train_loss,
             log_every=config.log_every,
         )
+        
+        # Print speedrun results
+        final_eval = results['final_metrics']
+        print("\n" + "="*70)
+        print(" SPEEDRUN RESULTS")
+        print("="*70)
+        print(f"Training Time (⏱️ Speedrun):      {format_time(results['training_time'])}")
+        print(f"Total Tokens:                    {results['tokens_seen']:,}")
+        print("-" * 70)
+        print(f"Final Train Loss:                {final_eval.get('train_loss', 0.0):.4f}")
+        print(f"Final Val Loss:                  {final_eval['val_loss']:.4f}")
+        print(f"Final Val Accuracy:              {final_eval['val_accuracy']:.4f}")
+        print("="*70 + "\n")
     else:
         train_minimal_llm(
             config, 
