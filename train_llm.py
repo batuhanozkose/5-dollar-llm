@@ -307,8 +307,6 @@ def main():
         print(f"\n🚀 Using FastLLM (parallel attention+ffn)")
         from models.fast_llm import FastLLM
         from training.trainer import warmup_compiled_kernels
-        import torch
-        import math
         
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         set_seed(42)
