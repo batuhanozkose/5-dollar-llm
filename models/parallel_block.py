@@ -13,7 +13,7 @@ Benefits:
 import torch
 import torch.nn as nn
 from .layers import MultiHeadAttention
-from .components import SwiGLUFeedForward
+from .components import SquaredReLUFeedForward
 
 
 class ParallelTransformerBlock(nn.Module):
@@ -48,7 +48,7 @@ class ParallelTransformerBlock(nn.Module):
         self.attention = MultiHeadAttention(
             d_model, n_heads, max_seq_len, dropout, n_kv_heads
         )
-        self.feed_forward = SwiGLUFeedForward(d_model, d_ff, dropout)
+        self.feed_forward = SquaredReLUFeedForward(d_model, d_ff, dropout)
         
         # Optional dropout (usually 0 for pretraining)
         self.dropout = nn.Dropout(dropout) if dropout > 0 else nn.Identity()
