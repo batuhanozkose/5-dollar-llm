@@ -60,11 +60,12 @@ def setup_muon_optimizer(model: nn.Module, config: BlueberryConfig):
     print(f"  Muon parameters: {sum(p.numel() for p in muon_params):,}")
     print(f"  AdamW parameters: {sum(p.numel() for p in adamw_params):,}")
 
-    muon_optimizer = Muon(muon_params, lr=config.muon_lr, momentum=config.muon_momentum, use_polar=config.use_polar)
+    muon_optimizer = Muon(muon_params, lr=config.muon_lr, momentum=config.muon_momentum)
     adamw_optimizer = torch.optim.AdamW(
         adamw_params,
         lr=config.adamw_lr,
-        weight_decay=config.weight_decay
+        weight_decay=config.weight_decay,
+        fused=torch.cuda.is_available()
     )
 
     return [muon_optimizer, adamw_optimizer]
@@ -105,7 +106,7 @@ def train_model(
         model, final_metrics, metrics_history
     """
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = model.to(device)
+    model = model.to(device, dtype=torch.bfloat16)
     
     if schedulers is None:
         schedulers = []
