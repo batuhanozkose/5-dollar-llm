@@ -44,23 +44,32 @@ class EarlyStopping:
 
 
 def setup_muon_optimizer(model: nn.Module, config: BlueberryConfig):
-    """Setup Muon optimizer with hybrid approach"""
-    muon_params = []
-    adamw_params = []
-
-    for name, param in model.named_parameters():
-        if (param.ndim == 2 and 
-            'token_embedding' not in name and 
-            'norm' not in name and 
-            param.requires_grad):
-            muon_params.append(param)
-        else:
-            adamw_params.append(param)
-
-    print(f"  Muon parameters: {sum(p.numel() for p in muon_params):,}")
+    """Setup Drop-Muon optimizer with layer-indexed param groups for epoch-shift dropping"""
+    layer_params = model.get_layer_param_mapping()
+    
+    # Create param groups with layer indices
+    muon_param_groups = []
+    total_muon_params = 0
+    muon_param_ids = set()
+    
+    for layer_idx, params in layer_params.items():
+        for param in params:
+            muon_param_groups.append({'params': [param], 'layer_idx': layer_idx})
+            total_muon_params += param.numel()
+            muon_param_ids.add(id(param))
+    
+    # Remaining params go to AdamW
+    adamw_params = [p for p in model.parameters() if id(p) not in muon_param_ids]
+    
+    print(f"  Muon parameters: {total_muon_params:,}")
     print(f"  AdamW parameters: {sum(p.numel() for p in adamw_params):,}")
 
-    muon_optimizer = Muon(muon_params, lr=config.muon_lr, momentum=config.muon_momentum)
+    muon_optimizer = Muon(
+        muon_param_groups, 
+        lr=config.muon_lr, 
+        momentum=config.muon_momentum,
+        num_layers=config.n_layers,
+    )
     adamw_optimizer = torch.optim.AdamW(
         adamw_params,
         lr=config.adamw_lr,
@@ -191,8 +200,17 @@ def train_model(
             # Optimizer step
             if (step + 1) % config.gradient_accumulation_steps == 0:
                 torch.nn.utils.clip_grad_norm_(model.parameters(), config.grad_clip)
+                
+                # Training progress for Drop-Muon epoch-shift layer dropping
+                tokens_per_opt_step = config.batch_size * config.max_seq_len * config.gradient_accumulation_steps
+                total_opt_steps = config.train_tokens // tokens_per_opt_step
+                progress = min(1.0, step / max(1, total_opt_steps))
+                
                 for optimizer in optimizers:
-                    optimizer.step()
+                    if isinstance(optimizer, Muon):
+                        optimizer.step(progress=progress)
+                    else:
+                        optimizer.step()
                     optimizer.zero_grad()
                 for scheduler in schedulers:
                     scheduler.step()
