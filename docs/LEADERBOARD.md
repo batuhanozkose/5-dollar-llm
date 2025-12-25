@@ -49,6 +49,7 @@ Please read [SETUP_INTRUCTIONS](docs/SETUP_INSTRUCTIONS.md) for detailed guide.
 | 3 | 2025-12-22 | 3.7439 | 3.7609 | 17m 8s 637ms | 100,007,936 | [ToheedAkhtar01](https://x.com/ToheedAkhtar01) [GitHub Polar](https://github.com/Open-Superintelligence-Lab/5-dollar-llm/pull/56); [GitHub AdamW](https://github.com/Open-Superintelligence-Lab/5-dollar-llm/pull/67/) | Fused AdamW; Polar Muon - it replaces Muon’s Newton-Schulz iteration with a fixed-coefficient iterative scheme for faster, numerically stable orthogonalization. |
 | 4 | 2025-12-23 | 3.6700 | 3.7094 | 16m 17s 221ms | 100,007,936 | [bigwolfeman](https://github.com/bigwolfeman) | Cast model into bf16 - model = model.to(device, dtype=torch.bfloat16), Note: Optimizers might require higher precision for longer runs |
 | 4 (new eval) | 2025-12-24 | 3.6568 | 3.7108 | 16m 44s 139ms | 100,007,936 | - | Included evaluations during training to plot loss curve. Training setup unchanged from #4. |
+| 5 | 2025-12-25 | 3.6568 | 3.7108 | 18m 38s 397ms | 100,007,936 | - | Included evaluations during training to plot loss curve. Training setup unchanged from #4. |
 
 ## 🏅 The 1B Marathon (World Record GPT-1)
 *Goal: Best Model @ 1B Tokens (GPT-1)*
