@@ -50,15 +50,24 @@ def setup_muon_optimizer(model: nn.Module, config: BlueberryConfig):
     adamw_params = []
 
     for name, param in model.named_parameters():
-        if (param.ndim == 2 and 
-            'token_embedding' not in name and 
-            'norm' not in name and 
-            param.requires_grad):
-            muon_params.append(param)
+        # If use_adamw_only is enabled, put all parameters in adamw_params
+        if getattr(config, 'use_adamw_only', False):
+            if param.requires_grad:
+                adamw_params.append(param)
         else:
-            adamw_params.append(param)
+            # Default: Muon for 2D weights, AdamW for embeddings/norms
+            if (param.ndim == 2 and 
+                'token_embedding' not in name and 
+                'norm' not in name and 
+                param.requires_grad):
+                muon_params.append(param)
+            else:
+                adamw_params.append(param)
 
-    print(f"  Muon parameters: {sum(p.numel() for p in muon_params):,}")
+    if getattr(config, 'use_adamw_only', False):
+        print(f"  🔧 Using AdamW for ALL parameters (universality test)")
+    else:
+        print(f"  Muon parameters: {sum(p.numel() for p in muon_params):,}")
     print(f"  AdamW parameters: {sum(p.numel() for p in adamw_params):,}")
 
     optimizers = []

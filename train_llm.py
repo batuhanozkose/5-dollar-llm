@@ -217,6 +217,7 @@ def main():
     parser.add_argument("--warmup", type=str, default="true", help="Whether to perform untimed compilation warmup (true/false)")
     parser.add_argument("--schedule_type", type=str, help="Override schedule_type (cosine, linear, constant, inverse_time, inverse_sqrt)")
     parser.add_argument("--coupled_wd", type=str, default="true", help="Whether to scale weight decay along with learning rate (true/false)")
+    parser.add_argument("--use_adamw_only", type=str, default="false", help="Use AdamW for all parameters instead of Muon hybrid (true/false)")
 
     args = parser.parse_args()
 
@@ -261,6 +262,7 @@ def main():
         config.schedule_type = args.schedule_type
     
     config.coupled_wd = (args.coupled_wd.lower() == "true")
+    config.use_adamw_only = (args.use_adamw_only.lower() == "true")
     
     # Define custom milestones for validation curves and autosetup logging
     # For 8M benchmark (approx 488 steps)
