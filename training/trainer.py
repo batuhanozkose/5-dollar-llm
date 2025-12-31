@@ -61,20 +61,26 @@ def setup_muon_optimizer(model: nn.Module, config: BlueberryConfig):
     print(f"  Muon parameters: {sum(p.numel() for p in muon_params):,}")
     print(f"  AdamW parameters: {sum(p.numel() for p in adamw_params):,}")
 
-    muon_optimizer = Muon(
-        muon_params, 
-        lr=config.muon_lr, 
-        momentum=config.muon_momentum,
-        weight_decay=config.weight_decay # Pass weight decay to Muon
-    )
-    adamw_optimizer = torch.optim.AdamW(
-        adamw_params,
-        lr=config.adamw_lr,
-        weight_decay=config.weight_decay,
-        fused=torch.cuda.is_available()
-    )
+    optimizers = []
+    if muon_params:
+        muon_optimizer = Muon(
+            muon_params, 
+            lr=config.muon_lr, 
+            momentum=config.muon_momentum,
+            weight_decay=config.weight_decay
+        )
+        optimizers.append(muon_optimizer)
+        
+    if adamw_params:
+        adamw_optimizer = torch.optim.AdamW(
+            adamw_params,
+            lr=config.adamw_lr,
+            weight_decay=config.weight_decay,
+            fused=torch.cuda.is_available()
+        )
+        optimizers.append(adamw_optimizer)
 
-    return [muon_optimizer, adamw_optimizer]
+    return optimizers
 
 
 def train_model(
@@ -126,6 +132,8 @@ def train_model(
         'val_perplexities': [],
         'elapsed_times': [],
         'learning_rates': [],
+        'weight_rms': [],
+        'update_rms': [],
     }
 
     # Training loop
@@ -252,6 +260,17 @@ def train_model(
                 elapsed_time = (time.time() - train_start_time) / 60
                 current_lr = schedulers[0].get_last_lr()[0] if schedulers else optimizers[0].param_groups[0]['lr']
                 
+                # Calculate Weight RMS
+                with torch.no_grad():
+                    total_sum_sq_w = sum(p.pow(2).sum().item() for p in model.parameters())
+                    total_count_w = sum(p.numel() for p in model.parameters())
+                    weight_rms = math.sqrt(total_sum_sq_w / total_count_w)
+                    
+                    # Estimate Update RMS by taking a mock step 
+                    # (This is approximate as we don't want to actually change weights here)
+                    # We'll just look at the last update direction if possible, 
+                    # but for now, let's just log Weight RMS more accurately.
+                
                 # Track metrics
                 metrics_history['steps'].append(step)
                 metrics_history['val_losses'].append(eval_metrics['val_loss'])
@@ -259,11 +278,47 @@ def train_model(
                 metrics_history['val_perplexities'].append(eval_metrics['val_perplexity'])
                 metrics_history['elapsed_times'].append(elapsed_time)
                 metrics_history['learning_rates'].append(current_lr)
+                metrics_history['weight_rms'].append(weight_rms)
                 
+                # For AdamW, we can try to inspect the state to get RMS(m/sqrt(v))
+                update_rms = 0.0
+                with torch.no_grad():
+                    update_sum_sq = 0.0
+                    update_count = 0
+                    for optimizer in optimizers:
+                        for group in optimizer.param_groups:
+                            for p in group['params']:
+                                state = optimizer.state[p]
+                                if isinstance(optimizer, Muon):
+                                    # Muon uses msign(momentum) scaled by sqrt(max(1, d_out/d_in))
+                                    # The msign part has RMS 1/sqrt(d_in). 
+                                    # Total RMS of the update direction is 1.0 (after the alpha scaling)
+                                    # Wait, as I calculated, (sqrt(d_out/d_in) / sqrt(d_out)) wait.
+                                    # Let's just compute it directly using zeropower_polar_express
+                                    if "momentum_buffer" in state:
+                                        from optimizers.muon import zeropower_polar_express
+                                        g = state["momentum_buffer"]
+                                        u = zeropower_polar_express(g, steps=group.get('ns_steps', 5))
+                                        # Apply the same scaling as in muon.py
+                                        scale = max(1, p.size(-2) / p.size(-1))**0.5
+                                        update_sum_sq += (u.pow(2).sum().item() * (scale**2))
+                                        update_count += p.numel()
+                                elif 'exp_avg' in state and 'exp_avg_sq' in state:
+                                    m = state['exp_avg']
+                                    v = state['exp_avg_sq']
+                                    eps = group.get('eps', 1e-8)
+                                    u = m / (v.sqrt() + eps)
+                                    update_sum_sq += u.pow(2).sum().item()
+                                    update_count += p.numel()
+                    if update_count > 0:
+                        update_rms = math.sqrt(update_sum_sq / update_count)
+                
+                metrics_history['update_rms'].append(update_rms)
+
                 print(f"\nStep {step}: Val Loss: {eval_metrics['val_loss']:.4f}, "
                       f"Val Acc: {eval_metrics['val_accuracy']:.4f}, "
                       f"Val PPL: {eval_metrics['val_perplexity']:.2f}, "
-                      f"LR: {current_lr:.5f}")
+                      f"LR: {current_lr:.5f}, RMS: {weight_rms:.4f}, UpRMS: {update_rms:.4f}")
                 
                 # Early stopping check
                 if early_stopper is not None:
@@ -291,12 +346,20 @@ def train_model(
         elapsed_time = (time.time() - train_start_time) / 60
         current_lr = schedulers[0].get_last_lr()[0] if schedulers else optimizers[0].param_groups[0]['lr']
         
+        # Calculate Weight RMS
+        with torch.no_grad():
+            total_sum_sq = sum(p.pow(2).sum().item() for p in model.parameters())
+            total_count = sum(p.numel() for p in model.parameters())
+            weight_rms = math.sqrt(total_sum_sq / total_count)
+            final_eval['weight_rms'] = weight_rms
+        
         metrics_history['steps'].append(step)
         metrics_history['val_losses'].append(final_eval['val_loss'])
         metrics_history['val_accuracies'].append(final_eval['val_accuracy'])
         metrics_history['val_perplexities'].append(final_eval['val_perplexity'])
         metrics_history['elapsed_times'].append(elapsed_time)
         metrics_history['learning_rates'].append(current_lr)
+        metrics_history['weight_rms'].append(weight_rms)
     else:
         # Use best metrics if stopped early
         if metrics_history['val_losses']:

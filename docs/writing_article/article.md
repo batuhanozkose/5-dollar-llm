@@ -381,6 +381,24 @@ The benchmark results provide conclusive empirical support for the article's cor
 2.  **Coupling as an Information Stabilizer**: Decaying Weight Decay alongside the Learning Rate (coupling) acts as a critical mechanism to maintain a consistent "Memory Period" relative to the training progress. The zoomed-in plot reveals that Experiment 6 (Coupled, WD=0.4) achieves the smoothest and deepest convergence, whereas constant WD configurations eventually hit a plateau where the regularization becomes misaligned with the effective step size.
 3.  **Enhanced Sample and Temporal Efficiency**: The "Optimal" schedule isn't just better in terms of final loss; it is significantly more efficient. By maintaining a theoretically calibrated training trajectory, we extract more value from every 1M tokens, achieving lower loss in less wall-clock time than standard constant-parameter baselines.
 
+### Weight RMS Equilibrium #
+
+Beyond performance, the "Sliding Average" theory makes a stunningly precise prediction about the **inner health** of the model. According to Equation (238), the model's global **Weight RMS** (Root Mean Square) should eventually stabilize at a value determined by the ratio of the Learning Rate ($\eta$) to Weight Decay ($\lambda$):
+
+$$\text{Weight RMS} \approx u_{rms} \sqrt{\frac{\eta}{2\lambda}}$$
+
+Where $u_{rms}$ is the RMS of the optimizer's update direction (typically $\approx 1$ for AdamW, or slightly less for Muon). 
+
+**Verification Experiment:**
+We trained the model with constant parameters ($\eta=0.024, \lambda=0.2$) and logged the Weight RMS and Update RMS (`UpRMS`) at every milestone. 
+
+![Weight RMS Equilibrium](./assets/rms_equilibrium_muon.png)
+
+**Key Findings:**
+-   **The Initial Kick**: In the first few steps, the optimizer's "UpRMS" is massive ($\approx 3.0$), causing a rapid expansion of the weights from their random initialization.
+-   **The Approach to Equilibrium**: As training continues, the update directions become more "noisy" and their RMS drops toward a steady-state ($\approx 0.17$). The Weight RMS follows this lead, bowing out from its initial growth and slowly decaying toward the predicted steady-state limit of $\approx 0.04 - 0.06$.
+-   **Predictable Training Dynamics**: This confirms that model training is not a random walk. It is a predictable physical system where the "energy" (weight magnitude) is a direct function of the regularization strength and learning speed.
+
 ### Summary #
 
 This article understands Weight Decay (WD) and Learning Rate (LR) from the perspective of sliding average, and explores the optimal WD Schedule and LR Schedule under this perspective.
