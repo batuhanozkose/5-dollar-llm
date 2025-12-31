@@ -214,6 +214,7 @@ def main():
     parser.add_argument("--gradient_accumulation_steps", type=int, help="Override gradient_accumulation_steps")
     parser.add_argument("--log_every", type=int, default=100, help="Logging frequency in steps")
     parser.add_argument("--warmup", type=str, default="true", help="Whether to perform untimed compilation warmup (true/false)")
+    parser.add_argument("--schedule_type", type=str, help="Override schedule_type (cosine, linear, constant, inverse_time)")
 
     args = parser.parse_args()
 
@@ -252,6 +253,8 @@ def main():
         config.gradient_accumulation_steps = args.gradient_accumulation_steps
     if args.log_every is not None:
         config.log_every = args.log_every
+    if args.schedule_type is not None:
+        config.schedule_type = args.schedule_type
     
     # Define custom milestones for validation curves and autosetup logging
     # For 8M benchmark (approx 488 steps)

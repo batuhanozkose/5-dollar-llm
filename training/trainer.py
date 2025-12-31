@@ -522,6 +522,33 @@ def train_minimal_llm(
                     return current_step / warmup
                 progress = (current_step - warmup) / max(1, total - warmup)
                 return max(0.1, 1.0 - progress)
+        elif schedule_type == 'inverse_time':
+            # Formula from article: eta = eta_max / (1 + lambda * eta_max * t)
+            # We apply this after warmup.
+            # lambda (weight_decay) and eta_max (lr) are taken from config/optimizer defaults.
+            # Since LambdaLR scales the base LR, we just return the decay factor.
+            
+            # We need to capture the specific optimizer's params for the formula
+            # But LambdaLR function only takes `step`. 
+            # We can capture the specific weight decay and peak LR from the optimizer instance outside.
+            wd = optimizer.defaults.get('weight_decay', 0.1) # Default to some value if missing, but it should be there for AdamW
+            lr_peak = optimizer.defaults['lr']
+            
+            # The article implies the "time" s is the number of steps.
+            # If we utilize warmup, we treat the end of warmup as t=0 for the decay curve for smoothness,
+            # or we just use raw steps.
+            # Let's align t=0 with the start of decay (end of warmup) to ensure continuity at peak.
+            
+            def lr_lambda(current_step, warmup=warmup_steps, wd=wd, lr_peak=lr_peak):
+                if current_step < warmup:
+                    return current_step / warmup
+                
+                # Time since peak
+                t = current_step - warmup
+                # Decay factor = 1 / (1 + lambda * eta_max * t)
+                denom = 1 + (wd * lr_peak * t)
+                return 1.0 / denom
+
         else:  # constant
             def lr_lambda(current_step, warmup=warmup_steps):
                 return current_step / warmup if current_step < warmup else 1.0
