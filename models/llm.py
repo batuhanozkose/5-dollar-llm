@@ -63,20 +63,11 @@ class MinimalLLM(nn.Module):
         for i, block in enumerate(self.transformer_blocks):
             x = block(x)
             
-            if getattr(self.config, "use_unet_skips", False):
-                if i < n_layers // 2:
-                    skip_connections.append(x)
-                elif i >= (n_layers - n_layers // 2): # Symmetry point
-                    # Symmetric skip connection
-                    # Example for 12 layers:
-                    # i=0 saved, i=11 uses i=0
-                    # i=1 saved, i=10 uses i=1
-                    # ...
-                    # i=5 saved, i=6 uses i=5
-                    
-                    # Logic: We want to pop the last added skip connection when we cross the halfway mark
-                    if skip_connections:
-                        x = x + skip_connections.pop()
+            # U-Net skip connections
+            if i < n_layers // 2:
+                skip_connections.append(x)
+            elif skip_connections:
+                x = x + skip_connections.pop()
 
         # Output projection
         x = self.norm(x)

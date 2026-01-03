@@ -13,9 +13,8 @@ class BlueberryConfig:
     # GQA parameters
     n_kv_heads: int = 4      
     
-    # Architecture improvements
-    use_unet_skips: bool = True
-    muon_drop_prob: float = 0.1 # Probability of dropping updates for Muon      
+    # Muon Drop probability
+    muon_drop_prob: float = 0.1      
     
     # Data params
     # ⚠️ WARNING: For simplicity, I recomend not changing max_seq_len
