@@ -256,7 +256,9 @@ def main():
     # Define custom milestones for validation curves and autosetup logging
     # For 8M benchmark (approx 488 steps)
     if config.train_tokens <= 8000000:
-        config.eval_milestones = (0, 50, 100, 150, 200, 300, 400)
+        config.eval_milestones = (0, 100, 250, 500, 750, 1000) #default
+        #config.eval_milestones = (0, 200, 400) --> 3 evals
+        #config.eval_milestones = () --> 1 eval (just final)
         config.log_every = 50
         config.eval_every = None  # Only use milestones
     # For 20M benchmark (approx 1220 steps)
@@ -332,8 +334,8 @@ def main():
 
     loader_args = dict(
         batch_size=config.batch_size,
-        num_workers=2,
-        pin_memory=torch.cuda.is_available(),
+        num_workers=4,
+        pin_memory=True,
         persistent_workers=True,
         worker_init_fn=worker_init_fn,
         generator=g,
